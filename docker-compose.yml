@@ -1,0 +1,19 @@
+# docker-compose.yml
+# version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: gamit-db
+    restart: always
+    environment:
+      POSTGRES_USER: jorge_admin
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_DB: gamit_registry
+    ports:
+      - "5432:5432" # Maps Docker 5432 to your machine's 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data: # Ensures data persists if you stop the container
