@@ -122,3 +122,20 @@ model AssetHistory {
 
   @@map("asset_history")
 }
+
+// ------------------------------------------------------
+// 4. AUTHENTICATION TABLE
+// ------------------------------------------------------
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   // We will store the Argon2 hash here, NEVER plain text
+  name      String
+  role      String   @default("USER") // e.g., 'ADMIN', 'GSO', 'USER'
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  @@map("users")
+}
