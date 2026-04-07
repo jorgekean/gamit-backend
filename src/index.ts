@@ -1,40 +1,42 @@
+// src/index.ts
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import postgres from '@fastify/postgres';
+import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
 import * as dotenv from 'dotenv';
-import { Pool } from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client/extension';
+
+// Import your new routes
+import { departmentRoutes } from './routes/department.routes.js';
+import { employeeRoutes } from './routes/employee.routes.js';
 
 dotenv.config();
 
-// 1. Create a standard Postgres connection pool
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL
-});
-
-// 2. Wrap it in the Prisma Adapter
-const adapter = new PrismaPg(pool);
-
-// 3. Initialize Prisma with the adapter
-export const prisma = new PrismaClient({ adapter });
-
 const fastify = Fastify({ logger: true });
 
-// Register Plugins
-fastify.register(cors);
-fastify.register(postgres, {
-    connectionString: process.env.DATABASE_URL
-});
+// 1. Setup Zod Compilers for Fastify (This makes your validation work automatically)
+fastify.setValidatorCompiler(validatorCompiler);
+fastify.setSerializerCompiler(serializerCompiler);
 
-// Health Check
+// 2. Register Plugins
+fastify.register(cors);
+
+// Notice we removed @fastify/postgres entirely. Prisma handles our database connections now!
+
+// 3. Health Check
 fastify.get('/health', async () => {
     return { status: 'Gamit API Active', timestamp: new Date() };
 });
 
+// 4. Register API Routes
+fastify.register(departmentRoutes, { prefix: '/api/departments' });
+// This tells Fastify that all routes inside employeeRoutes start with /api/employees
+fastify.register(employeeRoutes, { prefix: '/api/employees' });
+
+// 5. Start the Server
 const start = async () => {
     try {
-        await fastify.listen({ port: Number(process.env.PORT) || 3000, host: '0.0.0.0' });
+        const port = Number(process.env.PORT) || 3000;
+        await fastify.listen({ port, host: '0.0.0.0' });
+        console.log(`🚀 Server running at http://localhost:${port}`);
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
