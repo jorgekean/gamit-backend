@@ -1,0 +1,124 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ------------------------------------------------------
+// 1. ORGANIZATIONAL TABLES
+// ------------------------------------------------------
+
+model AssetCategory {
+  id           String   @id @default(uuid())
+  code         String   @unique // Added: e.g., "ICT", "FURN"
+  name         String   @unique // Renamed model to AssetCategory
+  description  String?
+  useLifeYears Int?     // Added: Default useful life in years for this category
+  
+  assets       Asset[]
+  
+  createdAt    DateTime @default(now()) @map("created_at") // Added
+  updatedAt    DateTime @updatedAt      @map("updated_at") // Added
+  deletedAt    DateTime? @map("deleted_at") // Added for soft delete
+
+  @@map("asset_categories") // Best practice for Postgres table naming
+}
+
+model Department {
+  id          String     @id @default(uuid())
+  code        String     @unique // Added: e.g., "GSO", "MAYOR"
+  name        String     @unique 
+  
+  employees   Employee[]
+  assets      Asset[]
+  
+  createdAt   DateTime   @default(now()) @map("created_at") // Added
+  updatedAt   DateTime   @updatedAt      @map("updated_at") // Added
+  deletedAt    DateTime? @map("deleted_at") // Added for soft delete
+
+  @@map("departments")
+}
+
+model Employee {
+  id           String      @id @default(uuid())
+  employeeNo   String      @unique // Added: e.g., "EMP-2026-001"
+  firstName    String
+  lastName     String
+  position     String      
+  
+  departmentId String
+  department   Department  @relation(fields: [departmentId], references: [id])
+  
+  assets       Asset[]     
+  
+  createdAt    DateTime    @default(now()) @map("created_at") // Added
+  updatedAt    DateTime    @updatedAt      @map("updated_at") // Added
+  deletedAt    DateTime? @map("deleted_at") // Added for soft delete
+
+  @@map("employees")
+}
+
+// ------------------------------------------------------
+// 2. THE CORE ASSET TABLE
+// ------------------------------------------------------
+
+model Asset {
+  id           String   @id @default(uuid())
+  propertyNo   String   @unique 
+  name         String   
+  
+  brand        String?
+  model        String?
+  serialNo     String?  
+  
+  cost         Float    
+  dateAcquired DateTime
+  usefulLife   Int?     
+  
+  status       String   @default("Serviceable")   
+  
+  categoryId   String
+  category     AssetCategory @relation(fields: [categoryId], references: [id])
+  
+  departmentId String?
+  department   Department?   @relation(fields: [departmentId], references: [id])
+  
+  employeeId   String?
+  employee     Employee?     @relation(fields: [employeeId], references: [id])
+
+  history      AssetHistory[]
+
+  createdAt    DateTime @default(now()) @map("created_at") // Added
+  updatedAt    DateTime @updatedAt      @map("updated_at") // Added
+  deletedAt    DateTime? @map("deleted_at") // Added for soft delete
+
+  @@map("assets")
+}
+
+// ------------------------------------------------------
+// 3. THE AUDIT TRAIL TABLE (From Screenshot)
+// ------------------------------------------------------
+
+model AssetHistory {
+  id          String   @id @default(uuid())
+  
+  assetId     String
+  asset       Asset    @relation(fields: [assetId], references: [id])
+  
+  date        DateTime // The exact time the action occurred
+  action      String   // e.g., 'Created', 'Transferred', 'Repaired'
+  performedBy String   // The user who made the change
+  description String   // Renamed from 'details'
+  
+  // The flexible JSON payload holding the "Before" and "After" state
+  changes     Json?    
+  
+  createdAt   DateTime @default(now()) @map("created_at") 
+  updatedAt   DateTime @updatedAt      @map("updated_at") 
+
+  @@map("asset_history")
+}
