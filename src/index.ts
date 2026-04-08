@@ -1,8 +1,10 @@
 // src/index.ts
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
+import { jsonSchemaTransform, serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
 import * as dotenv from 'dotenv';
+import fastifySwagger from '@fastify/swagger';
+import fastifySwaggerUi from '@fastify/swagger-ui';
 
 // Import your new routes
 import { departmentRoutes } from './routes/department.routes.js';
@@ -24,6 +26,34 @@ fastify.register(cors);
 // ... under your cors registration, add the JWT plugin:
 fastify.register(fastifyJwt, {
     secret: process.env.JWT_SECRET || 'super_secret_gamit_key_2026_change_me'
+});
+
+fastify.register(fastifySwagger, {
+    openapi: {
+        info: {
+            title: 'Gamit API',
+            description: 'Interactive API documentation for Gamit backend',
+            version: '1.0.0'
+        },
+        components: {
+            securitySchemes: {
+                bearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT'
+                }
+            }
+        }
+    },
+    transform: jsonSchemaTransform
+});
+
+fastify.register(fastifySwaggerUi, {
+    routePrefix: '/docs',
+    uiConfig: {
+        docExpansion: 'list',
+        deepLinking: false
+    }
 });
 
 
