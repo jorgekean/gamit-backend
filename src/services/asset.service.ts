@@ -1,9 +1,11 @@
 import { prisma } from '../lib/prisma.js';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
-import { createAssetSchema, updateAssetSchema } from '../schemas/asset.schema.js';
+import { createAssetSchema, updateAssetSchema, assetQuerySchema } from '../schemas/asset.schema.js';
 
 type CreateAssetInput = z.infer<typeof createAssetSchema>;
 type UpdateAssetInput = z.infer<typeof updateAssetSchema>;
+type AssetQueryParams = z.infer<typeof assetQuerySchema>;
 
 const assetIncludes = {
     category: true,
@@ -13,12 +15,48 @@ const assetIncludes = {
 
 export class AssetService {
 
-    static async getAll() {
-        return prisma.asset.findMany({
-            where: { deletedAt: null },
-            include: assetIncludes,
-            orderBy: { createdAt: 'desc' }
-        });
+    static async getAll(params: AssetQueryParams) {
+        const { page, limit, search, status, departmentId, categoryId, employeeId } = params;
+        const skip = (page - 1) * limit;
+
+        // 1. Build a dynamic WHERE clause
+        const where: Prisma.AssetWhereInput = {
+            deletedAt: null,
+            ...(status && { status }),
+            ...(departmentId && { departmentId }),
+            ...(categoryId && { categoryId }),
+            ...(employeeId && { employeeId }),
+            ...(search && {
+                OR: [
+                    { name: { contains: search, mode: 'insensitive' } },
+                    { propertyNo: { contains: search, mode: 'insensitive' } },
+                    { serialNo: { contains: search, mode: 'insensitive' } }
+                ]
+            })
+        };
+
+        // 2. Execute Count and Fetch in parallel for maximum performance
+        const [total, data] = await Promise.all([
+            prisma.asset.count({ where }),
+            prisma.asset.findMany({
+                where,
+                include: assetIncludes,
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit
+            })
+        ]);
+
+        // 3. Return the data along with pagination metadata
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit)
+            }
+        };
     }
 
     static async getById(id: string) {
@@ -63,7 +101,10 @@ export class AssetService {
             ...(data.employeeId !== undefined ? { employeeId: data.employeeId } : {})
         };
 
-        return prisma.asset.update({ where: { id }, data: updateData });
+        return prisma.asset.update({
+            where: { id },
+            data: updateData
+        });
     }
 
     static async softDelete(id: string) {

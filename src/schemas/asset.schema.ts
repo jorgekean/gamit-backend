@@ -24,3 +24,14 @@ export const updateAssetSchema = createAssetSchema
 export const assetParamsSchema = z.object({
     id: z.string().uuid()
 });
+
+
+export const assetQuerySchema = z.object({
+    page: z.coerce.number().min(1).default(1),
+    limit: z.coerce.number().min(1).max(100).default(50),
+    search: z.string().optional(),
+    status: z.string().optional(),
+    departmentId: z.string().uuid().optional(),
+    categoryId: z.string().uuid().optional(),
+    employeeId: z.string().uuid().optional()
+});

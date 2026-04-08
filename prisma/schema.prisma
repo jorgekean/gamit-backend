@@ -97,6 +97,12 @@ model Asset {
   deletedAt    DateTime? @map("deleted_at") // Added for soft delete
 
   @@map("assets")
+
+  @@index([propertyNo])
+  @@index([departmentId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([employeeId])
 }
 
 // ------------------------------------------------------

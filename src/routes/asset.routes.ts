@@ -1,15 +1,20 @@
 import { type FastifyInstance } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { AssetService } from '../services/asset.service.js';
-import { assetParamsSchema, createAssetSchema, updateAssetSchema } from '../schemas/asset.schema.js';
+import { assetParamsSchema, createAssetSchema, updateAssetSchema, assetQuerySchema } from '../schemas/asset.schema.js';
 
 export async function assetRoutes(fastify: FastifyInstance) {
     const server = fastify.withTypeProvider<ZodTypeProvider>();
 
-    server.get('/', async (request, reply) => {
-        const assets = await AssetService.getAll();
-        return reply.send({ success: true, data: assets });
-    });
+    server.get(
+        '/',
+        { schema: { querystring: assetQuerySchema } },
+        async (request, reply) => {
+            // request.query is fully typed and validated by Zod
+            const result = await AssetService.getAll(request.query);
+            return reply.send({ success: true, ...result });
+        }
+    );
 
     server.get(
         '/:id',
