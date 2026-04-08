@@ -7,6 +7,7 @@ import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 
 // Import your new routes
+import { assetCategoryRoutes } from './routes/asset-category.routes.js';
 import { departmentRoutes } from './routes/department.routes.js';
 import { employeeRoutes } from './routes/employee.routes.js';
 import { authRoutes } from './routes/auth.routes.js';
@@ -66,8 +67,8 @@ fastify.get('/health', async () => {
 
 // 4. Register API Routes
 fastify.register(authRoutes, { prefix: '/api/auth' });
+fastify.register(assetCategoryRoutes, { prefix: '/api/asset-categories' });
 fastify.register(departmentRoutes, { prefix: '/api/departments' });
-// This tells Fastify that all routes inside employeeRoutes start with /api/employees
 fastify.register(employeeRoutes, { prefix: '/api/employees' });
 
 // 5. Start the Server
