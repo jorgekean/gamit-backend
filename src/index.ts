@@ -8,6 +8,7 @@ import fastifySwaggerUi from '@fastify/swagger-ui';
 
 // Import your new routes
 import { assetRoutes } from './routes/asset.routes.js';
+import { assetHistoryRoutes } from './routes/asset-history.routes.js';
 import { assetCategoryRoutes } from './routes/asset-category.routes.js';
 import { dashboardRoutes } from './routes/dashboard.routes.js';
 import { departmentRoutes } from './routes/department.routes.js';
@@ -24,7 +25,12 @@ fastify.setValidatorCompiler(validatorCompiler);
 fastify.setSerializerCompiler(serializerCompiler);
 
 // 2. Register Plugins
-fastify.register(cors);
+fastify.register(cors, {
+    origin: ['http://localhost:5173'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+});
 
 // ... under your cors registration, add the JWT plugin:
 fastify.register(fastifyJwt, {
@@ -71,6 +77,7 @@ fastify.get('/health', async () => {
 fastify.register(authRoutes, { prefix: '/api/auth' });
 fastify.register(assetCategoryRoutes, { prefix: '/api/asset-categories' });
 fastify.register(assetRoutes, { prefix: '/api/assets' });
+fastify.register(assetHistoryRoutes, { prefix: '/api/asset-history' });
 fastify.register(dashboardRoutes, { prefix: '/api/dashboard' });
 fastify.register(departmentRoutes, { prefix: '/api/departments' });
 fastify.register(employeeRoutes, { prefix: '/api/employees' });
