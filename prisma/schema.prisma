@@ -54,6 +54,7 @@ model Employee {
   department   Department  @relation(fields: [departmentId], references: [id])
   
   assets       Asset[]     
+  user       User?
   
   createdAt    DateTime    @default(now()) @map("created_at") // Added
   updatedAt    DateTime    @updatedAt      @map("updated_at") // Added
@@ -135,10 +136,11 @@ model AssetHistory {
 
 model User {
   id        String   @id @default(uuid())
-  email     String   @unique
-  password  String   // We will store the Argon2 hash here, NEVER plain text
-  name      String
+  employeeId String   @unique
+  password  String   // We will store the Argon2 hash here, NEVER plain text  
   role      String   @default("USER") // e.g., 'ADMIN', 'GSO', 'USER'
+
+  employee   Employee @relation(fields: [employeeId], references: [id])
   
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt      @map("updated_at")

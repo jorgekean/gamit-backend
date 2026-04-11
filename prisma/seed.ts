@@ -8,11 +8,9 @@ import * as argon2 from 'argon2';
 // 1. Load the environment variables
 dotenv.config();
 
-// 2. Set up the exact same connection pool we use in the main app
+// 2. Set up connection pool with adapter
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
-
-// 3. Initialize Prisma WITH the adapter
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
@@ -41,20 +39,17 @@ async function main() {
 
     // 1.1 Seed Employees and attach valid department IDs
     const departments = await prisma.department.findMany({
-        where: {
-            code: {
-                in: defaultDepartments.map((d) => d.code)
-            }
-        },
-        select: {
-            id: true,
-            code: true
-        }
+        where: { code: { in: defaultDepartments.map((d) => d.code) } },
+        select: { id: true, code: true }
     });
 
     const departmentIdByCode = new Map(departments.map((d) => [d.code, d.id]));
 
     const defaultEmployees = [
+        // Added Specific Accounts for Auth Testing
+        { employeeNo: 'EMP-ADMIN-001', firstName: 'Jorge', lastName: 'Gamit', position: 'General Services Officer', departmentCode: 'GSO' },
+        { employeeNo: 'EMP-ENG-002', firstName: 'Juan', lastName: 'Dela Cruz', position: 'Municipal Engineer', departmentCode: 'ENG' },
+        // Standard Employee Pool
         { employeeNo: 'EMP-2026-001', firstName: 'Maria', lastName: 'Santos', position: 'Property Officer I', departmentCode: 'GSO' },
         { employeeNo: 'EMP-2026-002', firstName: 'Paolo', lastName: 'Dela Cruz', position: 'Supply Officer', departmentCode: 'GSO' },
         { employeeNo: 'EMP-2026-003', firstName: 'Liza', lastName: 'Reyes', position: 'Administrative Assistant', departmentCode: 'MAYOR' },
@@ -82,10 +77,7 @@ async function main() {
     let seededEmployees = 0;
     for (const emp of defaultEmployees) {
         const departmentId = departmentIdByCode.get(emp.departmentCode);
-
-        if (!departmentId) {
-            throw new Error(`Department code ${emp.departmentCode} not found while seeding employees.`);
-        }
+        if (!departmentId) throw new Error(`Department code ${emp.departmentCode} not found.`);
 
         await prisma.employee.upsert({
             where: { employeeNo: emp.employeeNo },
@@ -103,10 +95,9 @@ async function main() {
                 departmentId
             }
         });
-
         seededEmployees += 1;
     }
-    console.log(`✅ Seeded ${seededEmployees} Employees with valid department IDs.`);
+    console.log(`✅ Seeded ${seededEmployees} Employees.`);
 
     // 2. Seed COA Standard Asset Categories
     const defaultCategories = [
@@ -125,146 +116,92 @@ async function main() {
     for (const cat of defaultCategories) {
         await prisma.assetCategory.upsert({
             where: { code: cat.code },
-            update: {
-                name: cat.name,
-                useLifeYears: cat.useLifeYears
-            }, // Ensure names/years update if they change in the future
+            update: { name: cat.name, useLifeYears: cat.useLifeYears },
             create: { code: cat.code, name: cat.name, useLifeYears: cat.useLifeYears }
         });
     }
-    console.log(`✅ Seeded ${defaultCategories.length} COA Asset Categories.`);
+    console.log(`✅ Seeded ${defaultCategories.length} Asset Categories.`);
 
-    // 2.1 Seed Assets and distribute across employees and categories
-    const employees = await prisma.employee.findMany({
-        select: {
-            id: true,
-            departmentId: true
-        },
-        orderBy: {
-            employeeNo: 'asc'
-        }
-    });
+    // 2.1 Seed Assets
+    const employees = await prisma.employee.findMany({ select: { id: true, departmentId: true }, orderBy: { employeeNo: 'asc' } });
+    const categories = await prisma.assetCategory.findMany({ select: { id: true, useLifeYears: true }, orderBy: { code: 'asc' } });
 
-    const categories = await prisma.assetCategory.findMany({
-        where: {
-            code: {
-                in: defaultCategories.map((cat) => cat.code)
-            }
-        },
-        select: {
-            id: true,
-            name: true,
-            useLifeYears: true
-        },
-        orderBy: {
-            code: 'asc'
-        }
-    });
-
-    if (employees.length === 0) {
-        throw new Error('No employees found while seeding assets.');
-    }
-
-    if (categories.length === 0) {
-        throw new Error('No asset categories found while seeding assets.');
-    }
-
-    const assetNamePool = [
-        'Desktop Computer',
-        'Laptop Computer',
-        'Printer',
-        'Office Chair',
-        'Office Table',
-        'Projector',
-        'Filing Cabinet',
-        'Biometric Device',
-        'Network Switch',
-        'Router',
-        'Air Conditioner',
-        'Generator Set',
-        'Photocopier',
-        'LED Monitor',
-        'Vehicle Unit',
-        'Medical Cart',
-        'Wheelchair',
-        'Microscope',
-        'Public Address Speaker',
-        'Sports Equipment Set'
-    ];
-
-    const brandPool = ['Dell', 'HP', 'Epson', 'Canon', 'Toyota', 'Mitsubishi', 'Acer', 'Lenovo', 'Panasonic', 'Brother'];
+    const assetNamePool = ['Desktop Computer', 'Laptop Computer', 'Printer', 'Office Chair', 'Office Table', 'Projector', 'Filing Cabinet', 'Biometric Device', 'Network Switch', 'Router', 'Air Conditioner', 'Generator Set', 'Photocopier', 'LED Monitor', 'Vehicle Unit'];
+    const brandPool = ['Dell', 'HP', 'Epson', 'Canon', 'Toyota', 'Mitsubishi', 'Acer', 'Lenovo'];
     const statusPool = ['Serviceable', 'Under Repair', 'Unserviceable'];
-    const totalAssetsToSeed = 120;
 
     let seededAssets = 0;
-    for (let i = 1; i <= totalAssetsToSeed; i += 1) {
+    for (let i = 1; i <= 120; i += 1) {
         const employee = employees[(i - 1) % employees.length];
         const category = categories[(i - 1) % categories.length];
-        const assetName = assetNamePool[(i - 1) % assetNamePool.length];
-        const brand = brandPool[(i - 1) % brandPool.length];
-        const status = statusPool[(i - 1) % statusPool.length];
         const propertyNo = `PROP-2026-${String(i).padStart(4, '0')}`;
-        const serialNo = `SN-${String(i).padStart(6, '0')}`;
 
         await prisma.asset.upsert({
             where: { propertyNo },
             update: {
-                name: `${assetName} ${i}`,
-                brand,
+                name: `${assetNamePool[(i - 1) % assetNamePool.length]} ${i}`,
+                brand: brandPool[(i - 1) % brandPool.length],
                 model: `Model-${(i % 12) + 1}`,
-                serialNo,
+                serialNo: `SN-${String(i).padStart(6, '0')}`,
                 cost: 4500 + (i % 15) * 1750,
                 dateAcquired: new Date(2024, i % 12, ((i - 1) % 28) + 1),
                 usefulLife: category.useLifeYears,
-                status,
+                status: statusPool[(i - 1) % statusPool.length],
                 categoryId: category.id,
                 departmentId: employee.departmentId,
                 employeeId: employee.id
             },
             create: {
                 propertyNo,
-                name: `${assetName} ${i}`,
-                brand,
+                name: `${assetNamePool[(i - 1) % assetNamePool.length]} ${i}`,
+                brand: brandPool[(i - 1) % brandPool.length],
                 model: `Model-${(i % 12) + 1}`,
-                serialNo,
+                serialNo: `SN-${String(i).padStart(6, '0')}`,
                 cost: 4500 + (i % 15) * 1750,
                 dateAcquired: new Date(2024, i % 12, ((i - 1) % 28) + 1),
                 usefulLife: category.useLifeYears,
-                status,
+                status: statusPool[(i - 1) % statusPool.length],
                 categoryId: category.id,
                 departmentId: employee.departmentId,
                 employeeId: employee.id
             }
         });
-
         seededAssets += 1;
     }
-    console.log(`✅ Seeded ${seededAssets} Assets distributed across employees and categories.`);
+    console.log(`✅ Seeded ${seededAssets} Assets.`);
 
-    // 3. Seed Default Admin User
-    const adminEmail = 'admin@calaca.gov.ph';
+    // 3. Seed Users (Linked via employeeId instead of email)
     const adminPassword = await argon2.hash('GamitAdmin2026!');
+    const userPassword = await argon2.hash('GamitUser2026!');
 
-    await prisma.user.upsert({
-        where: { email: adminEmail },
-        update: {},
-        create: {
-            email: adminEmail,
-            name: 'System Administrator',
-            password: adminPassword,
-            role: 'ADMIN'
-        }
-    });
-    console.log(`✅ Seeded default Admin user (${adminEmail}).`);
+    // Fetch the DB UUIDs for the specific accounts we injected earlier
+    const adminEmp = await prisma.employee.findUnique({ where: { employeeNo: 'EMP-ADMIN-001' } });
+    const standardEmp = await prisma.employee.findUnique({ where: { employeeNo: 'EMP-ENG-002' } });
+
+    if (adminEmp) {
+        await prisma.user.upsert({
+            where: { employeeId: adminEmp.id },
+            update: { password: adminPassword, role: 'ADMIN' },
+            create: { employeeId: adminEmp.id, password: adminPassword, role: 'ADMIN' }
+        });
+        console.log(`✅ Seeded Admin User (EMP-ADMIN-001)`);
+    }
+
+    if (standardEmp) {
+        await prisma.user.upsert({
+            where: { employeeId: standardEmp.id },
+            update: { password: userPassword, role: 'USER' },
+            create: { employeeId: standardEmp.id, password: userPassword, role: 'USER' }
+        });
+        console.log(`✅ Seeded Standard User (EMP-ENG-002)`);
+    }
 
     console.log('🏁 Seeding finished successfully.');
 }
 
-// Execute the main function
 main()
     .catch((e) => {
-        console.error('❌ Seeding failed:');
-        console.error(e);
+        console.error('❌ Seeding failed:', e);
         process.exit(1);
     })
     .finally(async () => {

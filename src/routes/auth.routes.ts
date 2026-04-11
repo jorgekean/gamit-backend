@@ -18,12 +18,12 @@ export async function authRoutes(fastify: FastifyInstance) {
 
     // POST /api/auth/login
     server.post('/login', { schema: { body: loginSchema } }, async (request, reply) => {
-        const { email, password } = request.body;
+        const { employeeId, password } = request.body;
 
-        const user = await AuthService.verifyLogin(email, password);
+        const user = await AuthService.verifyLogin(employeeId, password);
 
         if (!user) {
-            return reply.code(401).send({ success: false, message: "Invalid email or password" });
+            return reply.code(401).send({ success: false, message: "Invalid employee ID or password" });
         }
 
         // Generate the JWT containing the user ID and Role
