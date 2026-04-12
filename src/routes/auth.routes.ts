@@ -30,7 +30,8 @@ export async function authRoutes(fastify: FastifyInstance) {
         const token = fastify.jwt.sign({
             id: user.id,
             role: user.role,
-            name: user.name
+            name: user.name,
+            employeeId: user.employeeId
         }, { expiresIn: '7d' }); // Token lasts for 7 days
 
         return reply.send({ success: true, token, user });

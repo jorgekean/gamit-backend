@@ -1,10 +1,11 @@
 // src/index.ts
-import Fastify from 'fastify';
+import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { jsonSchemaTransform, serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
 import * as dotenv from 'dotenv';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
+import fastifyJwt from '@fastify/jwt';
 
 // Import your new routes
 import { assetRoutes } from './routes/asset.routes.js';
@@ -14,17 +15,24 @@ import { dashboardRoutes } from './routes/dashboard.routes.js';
 import { departmentRoutes } from './routes/department.routes.js';
 import { employeeRoutes } from './routes/employee.routes.js';
 import { authRoutes } from './routes/auth.routes.js';
-import fastifyJwt from '@fastify/jwt';
+import { reportRoutes } from './routes/reports.js';
 
 dotenv.config();
 
+// 1. Tell TypeScript about our custom decorator
+declare module 'fastify' {
+    interface FastifyInstance {
+        authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    }
+}
+
 const fastify = Fastify({ logger: true });
 
-// 1. Setup Zod Compilers for Fastify (This makes your validation work automatically)
+// 2. Setup Zod Compilers for Fastify
 fastify.setValidatorCompiler(validatorCompiler);
 fastify.setSerializerCompiler(serializerCompiler);
 
-// 2. Register Plugins
+// 3. Register Plugins
 fastify.register(cors, {
     origin: ['http://localhost:5173'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -32,11 +40,20 @@ fastify.register(cors, {
     credentials: true
 });
 
-// ... under your cors registration, add the JWT plugin:
 fastify.register(fastifyJwt, {
     secret: process.env.JWT_SECRET || 'super_secret_gamit_key_2026_change_me'
 });
 
+// ✨ 4. Create the global authentication decorator
+fastify.decorate('authenticate', async function (request: FastifyRequest, reply: FastifyReply) {
+    try {
+        await request.jwtVerify();
+    } catch (err) {
+        return reply.status(401).send({ message: "Unauthorized: Invalid or missing token." });
+    }
+});
+
+// Swagger Documentation Setup
 fastify.register(fastifySwagger, {
     openapi: {
         info: {
@@ -65,22 +82,34 @@ fastify.register(fastifySwaggerUi, {
     }
 });
 
+// --- PUBLIC ROUTES ---
+// These routes execute without checking for a JWT token
 
-// Notice we removed @fastify/postgres entirely. Prisma handles our database connections now!
-
-// 3. Health Check
 fastify.get('/health', async () => {
     return { status: 'Gamit API Active', timestamp: new Date() };
 });
 
-// 4. Register API Routes
 fastify.register(authRoutes, { prefix: '/api/auth' });
-fastify.register(assetCategoryRoutes, { prefix: '/api/asset-categories' });
-fastify.register(assetRoutes, { prefix: '/api/assets' });
-fastify.register(assetHistoryRoutes, { prefix: '/api/asset-history' });
-fastify.register(dashboardRoutes, { prefix: '/api/dashboard' });
-fastify.register(departmentRoutes, { prefix: '/api/departments' });
-fastify.register(employeeRoutes, { prefix: '/api/employees' });
+
+// --- PROTECTED ROUTES ---
+// We create a "child" plugin. The onRequest hook ensures every route 
+// inside this block requires a valid JWT token.
+fastify.register(async function privateRoutes(childServer) {
+
+    // ✨ The Magic Hook: Secures all routes in this block
+    childServer.addHook('onRequest', childServer.authenticate);
+
+    // Register all core API routes (Notice the prefix is just the resource name, 
+    // because '/api' is applied to the entire wrapper below)
+    childServer.register(assetCategoryRoutes, { prefix: '/asset-categories' });
+    childServer.register(assetRoutes, { prefix: '/assets' });
+    childServer.register(assetHistoryRoutes, { prefix: '/asset-history' });
+    childServer.register(dashboardRoutes, { prefix: '/dashboard' });
+    childServer.register(departmentRoutes, { prefix: '/departments' });
+    childServer.register(employeeRoutes, { prefix: '/employees' });
+    childServer.register(reportRoutes, { prefix: '/reports' });
+
+}, { prefix: '/api' });
 
 // 5. Start the Server
 const start = async () => {
