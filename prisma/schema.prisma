@@ -90,8 +90,8 @@ model Asset {
   
   employeeId   String?
   employee     Employee?     @relation(fields: [employeeId], references: [id])
-
   history      AssetHistory[]
+  maintenance  MaintenanceRecord[]
 
   createdAt    DateTime @default(now()) @map("created_at") // Added
   updatedAt    DateTime @updatedAt      @map("updated_at") // Added
@@ -147,3 +147,31 @@ model User {
 
   @@map("users")
 }
+
+// ------------------------------------------------------
+// 5. MAINTENANCE TRACKING
+// ------------------------------------------------------
+
+model MaintenanceRecord {
+  id            String   @id @default(uuid())
+  
+  assetId       String
+  asset         Asset    @relation(fields: [assetId], references: [id])
+  
+  type          String   // e.g., 'Routine', 'Repair', 'Inspection'
+  status        String   @default("Scheduled") // 'Scheduled', 'In Progress', 'Completed', 'Cancelled'
+  description   String
+  
+  scheduledDate DateTime @map("scheduled_date")
+  completedDate DateTime? @map("completed_date")
+  cost          Float?
+  
+  performedBy   String?  @map("performed_by")
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt      @map("updated_at")
+
+  @@map("maintenance_records")
+  @@index([assetId])
+  @@index([status])
+}

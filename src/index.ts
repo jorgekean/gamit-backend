@@ -16,6 +16,7 @@ import { departmentRoutes } from './routes/department.routes.js';
 import { employeeRoutes } from './routes/employee.routes.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { reportRoutes } from './routes/reports.js';
+import { maintenanceRoutes } from './routes/maintenance.routes.js';
 
 dotenv.config();
 
@@ -108,6 +109,7 @@ fastify.register(async function privateRoutes(childServer) {
     childServer.register(departmentRoutes, { prefix: '/departments' });
     childServer.register(employeeRoutes, { prefix: '/employees' });
     childServer.register(reportRoutes, { prefix: '/reports' });
+    childServer.register(maintenanceRoutes, { prefix: '/maintenance' });
 
 }, { prefix: '/api' });
 
